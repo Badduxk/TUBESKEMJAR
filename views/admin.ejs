@@ -116,10 +116,15 @@
             </div>
         </div>
 
-        <div class="card card-custom p-4">
+        <div class="card card-custom p-4 mb-5">
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h5 class="fw-bold text-dark m-0"><i class="bi bi-terminal-matrix me-2 text-primary"></i>Konsol Manajemen Otoritas Sampah</h5>
-                <span class="badge bg-dark px-3 py-2 rounded-2 fw-mono text-info"><i class="bi bi-cpu me-1"></i>RBAC SECURE PASS</span>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-sm btn-success px-3 py-2 rounded-2 fw-semibold shadow-sm" data-bs-toggle="modal" data-bs-target="#addReportModal">
+                        <i class="bi bi-plus-circle-fill me-1"></i> Tambah Log Sampah
+                    </button>
+                    <span class="badge bg-dark px-3 py-2 rounded-2 fw-mono text-info d-none d-sm-inline-block"><i class="bi bi-cpu me-1"></i>RBAC SECURE PASS</span>
+                </div>
             </div>
 
             <div class="table-responsive">
@@ -131,7 +136,7 @@
                             <th scope="col" class="border-0 py-3">Kategori Mutu Sampah</th>
                             <th scope="col" class="border-0 py-3">Berat Bersih</th>
                             <th scope="col" class="border-0 py-3">Status Saat Ini</th>
-                            <th scope="col" class="border-0 py-3 text-center">Aksi Manajemen Otoritas</th>
+                            <th scope="col" class="border-0 py-3 text-center">Tindakan Otoritas</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -145,12 +150,12 @@
                                 <td class="fw-mono text-secondary">#<%= report.id %></td>
                                 <td>
                                     <div class="d-flex align-items-center">
-                                        <div class="bg-secondary bg-opacity-10 text-secondary px-2.5 py-1 rounded-circle me-2 fw-bold">
-                                            <%= report.username.charAt(0).toUpperCase() %>
+                                        <div class="bg-secondary bg-opacity-10 text-secondary px-2 py-1 rounded-circle me-2 fw-bold" style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;">
+                                            <%= report.username ? report.username.charAt(0).toUpperCase() : '?' %>
                                         </div>
                                         <span class="fw-semibold text-slate-700"><%= report.username %></span>
                                     </div>
-                                </td>
+                                ui>
                                 <td><span class="text-dark fw-medium"><%= report.waste_type %></span></td>
                                 <td><span class="badge bg-light text-dark border font-monospace px-2.5 py-1.5"><%= report.weight %> Kg</span></td>
                                 <td>
@@ -163,29 +168,229 @@
                                     <% } %>
                                 </td>
                                 <td>
-                                    <form action="/admin/update-status" method="POST" class="d-flex justify-content-center gap-2">
-                                        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-                                        <input type="hidden" name="report_id" value="<%= report.id %>">
+                                    <div class="d-flex justify-content-center gap-2">
+                                        <button class="btn btn-sm btn-outline-warning fw-semibold px-2.5 py-1" data-bs-toggle="modal" data-bs-target="#editReportModal<%= report.id %>">
+                                            <i class="bi bi-pencil-square"></i> Edit
+                                        </button>
                                         
-                                        <% if (report.status === 'Pending') { %>
-                                            <button type="submit" name="status" value="Diverifikasi" class="btn btn-sm btn-info text-dark fw-semibold px-3 rounded-2">
-                                                <i class="bi bi-shield-check me-1"></i>Verifikasi
+                                        <form action="/admin/reports/delete/<%= report.id %>" method="POST" onsubmit="return confirm('Apakah Anda yakin ingin menghapus log sampah ini secara permanen?')">
+                                            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                                            <button type="submit" class="btn btn-sm btn-outline-danger fw-semibold px-2.5 py-1">
+                                                <i class="bi bi-trash3-fill"></i> Hapus
                                             </button>
-                                        <% } else if (report.status === 'Diverifikasi') { %>
-                                            <button type="submit" name="status" value="Selesai" class="btn btn-sm btn-success fw-semibold px-3 rounded-2">
-                                                <i class="bi bi-check-circle me-1"></i>Selesaikan
-                                            </button>
-                                        <% } else { %>
-                                            <button class="btn btn-sm btn-light border text-muted px-3 rounded-2" disabled>
-                                                <i class="bi bi-lock-fill me-1"></i>Terarsip
-                                            </button>
-                                        <% } %>
-                                    </form>
+                                        </form>
+                                    </div>
                                 </td>
                             </tr>
+
+                            <div class="modal fade" id="editReportModal<%= report.id %>" tabindex="-1" aria-hidden="true">
+                                <div class="modal-dialog modal-dialog-centered">
+                                    <div class="modal-content shadow border-0" style="border-radius: 12px;">
+                                        <form action="/admin/reports/edit/<%= report.id %>" method="POST">
+                                            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                                            <div class="modal-header border-0 bg-light py-3">
+                                                <h5 class="modal-title fw-bold text-dark"><i class="bi bi-pencil-square text-warning me-1"></i> Perbarui Log Sampah #<%= report.id %></h5>
+                                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                            </div>
+                                            <div class="modal-body p-4">
+                                                <div class="mb-3">
+                                                    <label class="form-label fw-semibold text-secondary">Pelapor (Warga)</label>
+                                                    <input type="text" class="form-control bg-light" value="<%= report.username %>" readonly>
+                                                </div>
+                                                <div class="mb-3">
+                                                    <label class="form-label fw-semibold text-secondary">Kategori Mutu Sampah</label>
+                                                    <input type="text" name="waste_type" class="form-control" value="<%= report.waste_type %>" required>
+                                                </div>
+                                                <div class="mb-3">
+                                                    <label class="form-label fw-semibold text-secondary">Berat Bersih (Kg)</label>
+                                                    <input type="number" step="0.1" name="weight" class="form-control" value="<%= report.weight %>" required>
+                                                </div>
+                                                <div class="mb-2">
+                                                    <label class="form-label fw-semibold text-secondary">Status Otoritas</label>
+                                                    <select name="status" class="form-select">
+                                                        <option value="Pending" <%= report.status === 'Pending' ? 'selected' : '' %>>⏳ Pending</option>
+                                                        <option value="Diverifikasi" <%= report.status === 'Diverifikasi' ? 'selected' : '' %>>🔍 Diverifikasi</option>
+                                                        <option value="Selesai" <%= report.status === 'Selesai' ? 'selected' : '' %>>✅ Selesai</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                            <div class="modal-footer border-0 py-3 bg-light">
+                                                <button type="button" class="btn btn-sm btn-secondary px-3" data-bs-dismiss="modal">Batal</button>
+                                                <button type="submit" class="btn btn-sm btn-warning px-3 fw-semibold text-dark">Simpan Perubahan</button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
                         <% }) %>
                     </tbody>
                 </table>
+            </div>
+        </div>
+
+        <div class="card card-custom p-4">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h5 class="fw-bold text-dark m-0"><i class="bi bi-people-fill me-2 text-primary"></i>Konsol Manajemen Akun Pengguna</h5>
+                <button class="btn btn-sm btn-primary px-3 py-2 rounded-2 fw-semibold shadow-sm" data-bs-toggle="modal" data-bs-target="#addUserModal">
+                    <i class="bi bi-person-plus-fill me-1"></i> Tambah Pengguna Baru
+                </button>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table table-hover align-middle table-panel">
+                    <thead>
+                        <tr>
+                            <th scope="col" class="border-0 py-3">ID User</th>
+                            <th scope="col" class="border-0 py-3">Username</th>
+                            <th scope="col" class="border-0 py-3">Hak Akses (Role)</th>
+                            <th scope="col" class="border-0 py-3 text-center">Tindakan Otoritas</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% users.forEach(u => { %>
+                            <tr>
+                                <td class="fw-mono text-secondary">#<%= u.id %></td>
+                                <td>
+                                    <span class="fw-semibold text-dark"><%= u.username %></span>
+                                    <% if (u.id === user.id) { %>
+                                        <span class="badge bg-secondary ms-1 text-xs">Kamu</span>
+                                    <% } %>
+                                </td>
+                                <td>
+                                    <span class="badge <%= u.role === 'admin' ? 'bg-danger bg-opacity-10 text-danger' : 'bg-primary bg-opacity-10 text-primary' %> px-2.5 py-1.5 rounded-2 fw-medium text-uppercase">
+                                        <%= u.role %>
+                                    </span>
+                                </td>
+                                <td>
+                                    <div class="d-flex justify-content-center gap-2">
+                                        <button class="btn btn-sm btn-outline-warning fw-semibold px-2.5 py-1" data-bs-toggle="modal" data-bs-target="#editUserModal<%= u.id %>">
+                                            <i class="bi bi-pencil-square"></i> Edit
+                                        </button>
+                                        
+                                        <form action="/admin/users/delete/<%= u.id %>" method="POST" onsubmit="return confirm('Apakah Anda yakin ingin menghapus akun ini permanen?')">
+                                            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                                            <button type="submit" class="btn btn-sm btn-outline-danger fw-semibold px-2.5 py-1" <%= u.id === user.id ? 'disabled title="Tidak bisa menghapus akun sendiri"' : '' %>>
+                                                <i class="bi bi-trash3-fill"></i> Hapus
+                                            </button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+
+                            <div class="modal fade" id="editUserModal<%= u.id %>" tabindex="-1" aria-hidden="true">
+                                <div class="modal-dialog modal-dialog-centered">
+                                    <div class="modal-content shadow border-0" style="border-radius: 12px;">
+                                        <form action="/admin/users/edit/<%= u.id %>" method="POST">
+                                            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                                            <div class="modal-header border-0 bg-light py-3">
+                                                <h5 class="modal-title fw-bold text-dark"><i class="bi bi-pencil-square text-warning me-1"></i> Edit Pengguna #<%= u.id %></h5>
+                                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                            </div>
+                                            <div class="modal-body p-4">
+                                                <div class="mb-3">
+                                                    <label class="form-label fw-semibold text-secondary">Username</label>
+                                                    <input type="text" name="username" class="form-control" value="<%= u.username %>" required>
+                                                </div>
+                                                <div class="mb-2">
+                                                    <label class="form-label fw-semibold text-secondary">Role Otoritas</label>
+                                                    <select name="role" class="form-select">
+                                                        <option value="warga" <%= u.role === 'warga' ? 'selected' : '' %>>Warga</option>
+                                                        <option value="admin" <%= u.role === 'admin' ? 'selected' : '' %>>Admin</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                            <div class="modal-footer border-0 py-3 bg-light">
+                                                <button type="button" class="btn btn-sm btn-secondary px-3" data-bs-dismiss="modal">Batal</button>
+                                                <button type="submit" class="btn btn-sm btn-warning px-3 fw-semibold text-dark">Simpan Perubahan</button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                        <% }) %>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+
+    <div class="modal fade" id="addReportModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content shadow border-0" style="border-radius: 12px;">
+                <form action="/admin/reports/add" method="POST">
+                    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                    <div class="modal-header border-0 bg-light py-3">
+                        <h5 class="modal-title fw-bold text-dark"><i class="bi bi-plus-circle-fill text-success me-1"></i> Suntik Log Sampah Baru</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body p-4">
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold text-secondary">Pilih Pemilik / Pelapor (Warga)</label>
+                            <select name="user_id" class="form-select" required>
+                                <option value="" disabled selected>-- Pilih Akun Terdaftar --</option>
+                                <% users.forEach(u => { %>
+                                    <option value="<%= u.id %>"><%= u.username %> (<%= u.role %>)</option>
+                                <% }) %>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold text-secondary">Kategori Mutu Sampah</label>
+                            <input type="text" name="waste_type" class="form-control" placeholder="Contoh: Plastik PET, Elektronik, Organik" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold text-secondary">Berat Bersih (Kg)</label>
+                            <input type="number" step="0.1" name="weight" class="form-control" placeholder="0.0" required>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label fw-semibold text-secondary">Status Awal</label>
+                            <select name="status" class="form-select">
+                                <option value="Pending" selected>⏳ Pending</option>
+                                <option value="Diverifikasi">🔍 Diverifikasi</option>
+                                <option value="Selesai">✅ Selesai</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="modal-footer border-0 py-3 bg-light">
+                        <button type="button" class="btn btn-sm btn-secondary px-3" data-bs-dismiss="modal">Batal</button>
+                        <button type="submit" class="btn btn-sm btn-success px-3 fw-semibold">Suntik Log Laporan</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="addUserModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content shadow border-0" style="border-radius: 12px;">
+                <form action="/admin/users/add" method="POST">
+                    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                    <div class="modal-header border-0 bg-light py-3">
+                        <h5 class="modal-title fw-bold text-dark"><i class="bi bi-person-plus-fill text-primary me-1"></i> Daftarkan User Baru</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body p-4">
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold text-secondary">Username Baru</label>
+                            <input type="text" name="username" class="form-control" placeholder="Masukkan username" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold text-secondary">Password Sistem</label>
+                            <input type="password" name="password" class="form-control" placeholder="Masukkan password sandi" required>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label fw-semibold text-secondary">Role</label>
+                            <select name="role" class="form-select">
+                                <option value="warga">Warga (Masyarakat)</option>
+                                <option value="admin">Admin (Otoritas Sistem)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="modal-footer border-0 py-3 bg-light">
+                        <button type="button" class="btn btn-sm btn-secondary px-3" data-bs-dismiss="modal">Batal</button>
+                        <button type="submit" class="btn btn-sm btn-primary px-3 fw-semibold">Daftarkan Akun</button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>

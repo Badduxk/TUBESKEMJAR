@@ -12,19 +12,13 @@ const app = express();
 const PORT = 3000;
 
 // ==========================================
-// 1. HARDENING & INFRASTRUCTURE SECURITY [cite: 30, 33]
+// 1. HARDENING & INFRASTRUCTURE SECURITY 
 // ==========================================
-// Mengamankan HTTP Header menggunakan Helmet [cite: 34]
 app.use(helmet({
     contentSecurityPolicy: {
         directives: {
-            // Pastikan default-src mengarah ke 'self', bukan 'none'
             defaultSrc: ["'self'"],
-            
-            // SOLUSI: Mengizinkan koneksi internal browser/DevTools ke server lokal
             connectSrc: ["'self'", "http://localhost:3000", "ws://localhost:3000"],
-            
-            // Pengaturan aset lainnya tetap aman
             scriptSrc: ["'self'", "'unsafe-inline'", "cdn.jsdelivr.net"],
             styleSrc: ["'self'", "'unsafe-inline'", "cdn.jsdelivr.net"],
             fontSrc: ["'self'", "cdn.jsdelivr.net"],
@@ -33,10 +27,9 @@ app.use(helmet({
     }
 }));
 
-// Rate Limiting: Mencegah Brute Force & DoS skala kecil [cite: 41, 75]
 const generalLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 Menit
-    max: 100, // Maksimal 100 request per IP
+    windowMs: 15 * 60 * 1000, 
+    max: 100, 
     message: "🛡️ Terlalu banyak request dari IP Anda. Sila coba beberapa saat lagi."
 });
 app.use(generalLimiter);
@@ -53,13 +46,12 @@ app.use(session({
     resave: false,
     saveUninitialized: false,
     cookie: {
-        httpOnly: true, // Proteksi dari pencurian session via XSS [cite: 39]
-        secure: false,  // Set ke true jika sudah menggunakan HTTPS/TLS di server [cite: 53]
-        maxAge: 60 * 60 * 1000 // Session kedaluwarsa dalam 1 Jam
+        httpOnly: true, 
+        secure: false,  
+        maxAge: 60 * 60 * 1000 
     }
 }));
 
-// Set View Engine ke EJS
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 
@@ -69,14 +61,13 @@ app.set('views', path.join(__dirname, 'views'));
 const db = mysql.createPool({
     host: 'localhost',
     user: 'root',
-    password: '12345', // Sesuaikan jika database Laragon kamu bermonitor password
+    password: '12345', 
     database: 'ecodrop_db',
     waitForConnections: true,
     connectionLimit: 10,
     queueLimit: 0
 });
 
-// Tes Koneksi Database
 db.getConnection((err, connection) => {
     if (err) {
         console.error('❌ Koneksi database MySQL gagal:', err.message);
@@ -92,7 +83,6 @@ db.getConnection((err, connection) => {
 const csrfProtection = csrf({ cookie: true });
 app.use(csrfProtection);
 
-// Middleware untuk menyisipkan CSRF Token global ke setiap render EJS 
 app.use((req, res, next) => {
     res.locals.csrfToken = req.csrfToken();
     next();
@@ -101,7 +91,6 @@ app.use((req, res, next) => {
 // ==========================================
 // 5. ROLE-BASED ACCESS CONTROL (RBAC) MIDDLEWARES 
 // ==========================================
-// Memastikan user sudah otentikasi (login)
 const isAuthenticated = (req, res, next) => {
     if (req.session.userId) {
         return next();
@@ -109,7 +98,6 @@ const isAuthenticated = (req, res, next) => {
     res.redirect('/login');
 };
 
-// Validasi Khusus Role Warga 
 const isWarga = (req, res, next) => {
     if (req.session.userId && req.session.role === 'warga') {
         return next();
@@ -117,7 +105,6 @@ const isWarga = (req, res, next) => {
     res.status(403).send('🛡️ Akses Ditolak: Halaman ini khusus untuk jalur akun Warga.');
 };
 
-// Validasi Khusus Role Admin 
 const isAdmin = (req, res, next) => {
     if (req.session.userId && req.session.role === 'admin') {
         return next();
@@ -126,48 +113,56 @@ const isAdmin = (req, res, next) => {
 };
 
 app.get('/', (req, res) => {
-    // Jalur pintar: Jika user sudah login, cek role-nya untuk dilempar ke dashboard yang sesuai
     if (req.session.userId) {
         return req.session.role === 'admin' ? res.redirect('/admin') : res.redirect('/dashboard');
     }
-    // Jika belum login, otomatis alihkan ke halaman login
     res.redirect('/login');
 });
 
 // ==========================================
 // 6. ROUTES - AUTHENTICATION SUITE
 // ==========================================
-
-// [GET] Halaman Login
 app.get('/login', (req, res) => {
     if (req.session.userId) {
         return req.session.role === 'admin' ? res.redirect('/admin') : res.redirect('/dashboard');
     }
-    res.render('login'); // Pastikan kamu punya file views/login.ejs
+    res.render('login'); 
 });
 
-// [POST] Memproses Login (Validasi Password Hashing & Deteksi RBAC) [cite: 35, 42]
 app.post('/login', (req, res) => {
     const { username, password } = req.body;
 
-    // Prepared Statement mencegah SQL Injection 
     const query = 'SELECT * FROM users WHERE username = ?';
     db.execute(query, [username], async (err, results) => {
-        if (err) return res.status(500).send("Terjadi kendala pada internal server.");
-        if (results.length === 0) return res.status(401).send("Username atau Password salah.");
+        if (err) {
+            return res.status(500).send(`<h3>❌ Error Database</h3><p>${err.message}</p>`);
+        }
+        
+        if (results.length === 0) {
+            return res.status(401).send(`
+                <div style="font-family: sans-serif; padding: 20px; border: 2px solid red; background: #fff5f5;">
+                    <h2>❌ Gagal: Username Tidak Ditemukan!</h2>
+                    <p>Sistem mencari user dengan nama <b>"${username}"</b> di database, tapi hasilnya <b>KOSONG (0 baris)</b>.</p>
+                </div>
+            `);
+        }
 
         const user = results[0];
-
-        // Validasi Password Hash [cite: 35]
         const isMatch = await bcrypt.compare(password, user.password);
-        if (!isMatch) return res.status(401).send("Username atau Password salah.");
 
-        // Menyimpan data kredensial ke Session Server 
+        if (!isMatch) {
+            return res.status(401).send(`
+                <div style="font-family: sans-serif; padding: 20px; border: 2px solid orange; background: #fff9f0;">
+                    <h2>❌ Gagal: Password Mismatch (Tidak Cocok)!</h2>
+                    <p>User <b>"${user.username}"</b> ketemu di database, tapi password-nya ditolak oleh Bcrypt.</p>
+                </div>
+            `);
+        }
+
         req.session.userId = user.id;
         req.session.username = user.username;
         req.session.role = user.role;
 
-        // Pengalihan cerdas berbasis Otoritas Role (RBAC) 
         if (user.role === 'admin') {
             res.redirect('/admin');
         } else {
@@ -176,24 +171,18 @@ app.post('/login', (req, res) => {
     });
 });
 
-// [GET] Halaman Registrasi Warga
 app.get('/register', (req, res) => {
-    res.render('register'); // Pastikan kamu punya file views/register.ejs
+    res.render('register'); 
 });
 
-// [POST] Proses Registrasi Akun Warga Baru [cite: 35]
 app.post('/register', async (req, res) => {
     const { username, password } = req.body;
     
     try {
-        // Enkripsi password menggunakan Bcrypt [cite: 35]
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
 
-        // Secara default, registrasi mandiri diarahkan sebagai role 'warga' 
-        // Menghindari celah Privilege Escalation dari sisi client 
         const query = 'INSERT INTO users (username, password, role) VALUES (?, ?, "warga")';
-        
         db.execute(query, [username, hashedPassword], (err, result) => {
             if (err) {
                 if (err.code === 'ER_DUP_ENTRY') return res.status(400).send("Username sudah terdaftar.");
@@ -209,10 +198,7 @@ app.post('/register', async (req, res) => {
 // ==========================================
 // 7. ROUTES - CORE SYSTEMS (WARGA / DASHBOARD)
 // ==========================================
-
-// [GET] Dashboard Utama Warga (Membaca Riwayat Milik Sendiri) 
 app.get('/dashboard', isAuthenticated, isWarga, (req, res) => {
-    // Memastikan Warga HANYA bisa membaca data miliknya sendiri (Pencegahan IDOR / Broken Object Level Authorization) 
     const query = 'SELECT * FROM waste_reports WHERE user_id = ? ORDER BY created_at DESC';
     
     db.execute(query, [req.session.userId], (err, reports) => {
@@ -225,11 +211,9 @@ app.get('/dashboard', isAuthenticated, isWarga, (req, res) => {
     });
 });
 
-// [POST] Mengirimkan Setoran Sampah Baru oleh Warga [cite: 37]
 app.post('/report', isAuthenticated, isWarga, (req, res) => {
     const { waste_type, weight, description } = req.body;
 
-    // Server-side Input Validation (Validasi tipe data makro) [cite: 37]
     const parsedWeight = parseFloat(weight);
     if (isNaN(parsedWeight) || parsedWeight <= 0) {
         return res.status(400).send("Input berat sampah tidak valid.");
@@ -244,30 +228,42 @@ app.post('/report', isAuthenticated, isWarga, (req, res) => {
 });
 
 // ==========================================
-// 8. ROUTES - CORE SYSTEMS (ADMIN CONTROL PANEL) 
+// 8. ROUTES - CORE SYSTEMS (ADMIN CONTROL PANEL & CRUD USER)
 // ==========================================
 
-// [GET] Panel Kendali Utama Admin (Membaca Seluruh Data Sistem) 
+// [GET] Panel Kendali Utama Admin (Membaca Seluruh Data Sistem + Data Users)
 app.get('/admin', isAuthenticated, isAdmin, (req, res) => {
-    // SQL JOIN: Menggabungkan tabel laporan dengan nama user pelapornya 
     const queryReports = `
         SELECT waste_reports.*, users.username 
         FROM waste_reports 
         JOIN users ON waste_reports.user_id = users.id 
         ORDER BY waste_reports.created_at DESC`;
         
-    const queryUsers = 'SELECT COUNT(*) as total_users FROM users WHERE role = "warga"';
+    const queryUsersCount = 'SELECT COUNT(*) as total_users FROM users WHERE role = "warga"';
+    
+    // Query Tambahan: Mengambil list semua user untuk disuplai ke tabel CRUD Pengguna
+    const queryAllUsers = 'SELECT id, username, role FROM users ORDER BY id DESC';
 
     db.execute(queryReports, [], (err, reports) => {
         if (err) return res.status(500).send("Gagal mengambil repositori log sampah.");
 
-        db.execute(queryUsers, [], (errUsers, userResult) => {
+        db.execute(queryUsersCount, [], (errUsers, userResult) => {
             if (errUsers) return res.status(500).send("Gagal memuat arsitektur statistik.");
 
-            res.render('admin', {
-                user: req.session,
-                reports: reports,
-                totalUsers: userResult[0].total_users
+            db.execute(queryAllUsers, [], (errAllUsers, allUsersResult) => {
+                if (errAllUsers) return res.status(500).send("Gagal memuat data repositori pengguna.");
+
+                // Render halaman dengan struktur objek user yang disesuaikan agar cocok dengan pencocokan ID (<%= user.id %>)
+                res.render('admin', {
+                    user: {
+                        id: req.session.userId,
+                        username: req.session.username,
+                        role: req.session.role
+                    },
+                    reports: reports,
+                    totalUsers: userResult[0].total_users,
+                    users: allUsersResult // Data krusial untuk perulangan tabel CRUD Pengguna
+                });
             });
         });
     });
@@ -277,7 +273,6 @@ app.get('/admin', isAuthenticated, isAdmin, (req, res) => {
 app.post('/admin/update-status', isAuthenticated, isAdmin, (req, res) => {
     const { report_id, status } = req.body;
 
-    // Membatasi status agar tidak di-inject nilai teks aneh selain opsi sistem [cite: 37]
     const allowedStatus = ['Pending', 'Diverifikasi', 'Selesai'];
     if (!allowedStatus.includes(status)) {
         return res.status(400).send("Parameter manipulasi status tidak diizinkan.");
@@ -291,18 +286,75 @@ app.post('/admin/update-status', isAuthenticated, isAdmin, (req, res) => {
     });
 });
 
+app.post('/admin/reports/delete/:id', isAuthenticated, isAdmin, (req, res) => {
+    const { id } = req.params;
+
+    const query = "DELETE FROM waste_reports WHERE id = ?";
+    db.execute(query, [id], (err) => {
+        if (err) return res.status(500).send("Gagal melenyapkan data laporan sampah: " + err.message);
+        res.redirect('/admin');
+    });
+});
+
+// [POST] CRUD: Membuat Akun User Baru dari Sisi Admin
+app.post('/admin/users/add', isAuthenticated, isAdmin, async (req, res) => {
+    const { username, password, role } = req.body;
+    try {
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(password, salt);
+
+        const query = "INSERT INTO users (username, password, role) VALUES (?, ?, ?)";
+        db.execute(query, [username, hashedPassword, role], (err) => {
+            if (err) {
+                if (err.code === 'ER_DUP_ENTRY') return res.status(400).send("<script>alert('Username sudah terdaftar!'); window.location='/admin';</script>");
+                return res.status(500).send("Gagal menyuntikkan user baru: " + err.message);
+            }
+            res.redirect('/admin');
+        });
+    } catch (e) {
+        res.status(500).send("System Integrity Error: " + e.message);
+    }
+});
+
+// [POST] CRUD: Mengubah Data Akun User (Username & Role)
+app.post('/admin/users/edit/:id', isAuthenticated, isAdmin, (req, res) => {
+    const { id } = req.params;
+    const { username, role } = req.body;
+
+    const query = "UPDATE users SET username = ?, role = ? WHERE id = ?";
+    db.execute(query, [username, role, id], (err) => {
+        if (err) return res.status(500).send("Gagal memperbarui data user: " + err.message);
+        res.redirect('/admin');
+    });
+});
+
+// [POST] CRUD: Menghapus Akun User Secara Permanen
+app.post('/admin/users/delete/:id', isAuthenticated, isAdmin, (req, res) => {
+    const { id } = req.params;
+
+    // Defensif: Jangan biarkan admin menghapus dirinya sendiri secara tidak sengaja
+    if (parseInt(id) === req.session.userId) {
+        return res.status(400).send("<script>alert('Proteksi Keamanan: Anda tidak diperbolehkan menghapus akun Admin Anda sendiri yang sedang aktif!'); window.location='/admin';</script>");
+    }
+
+    const query = "DELETE FROM users WHERE id = ?";
+    db.execute(query, [id], (err) => {
+        if (err) return res.status(500).send("Gagal melenyapkan data user: " + err.message);
+        res.redirect('/admin');
+    });
+});
+
 // ==========================================
 // 9. LOGOUT SUITE & GLOBAL ERROR CLEANUP 
 // ==========================================
 app.get('/logout', (req, res) => {
     req.session.destroy((err) => {
         if (err) return res.status(500).send("Gagal menghancurkan sesi aktif.");
-        res.clearCookie('connect.sid'); // Bersihkan cookie session di browser client
+        res.clearCookie('connect.sid'); 
         res.redirect('/login');
     });
 });
 
-// Menangani Error CSRF Token secara elegan agar tidak crash 
 app.use((err, req, res, next) => {
     if (err.code === 'EBADCSRFTOKEN') {
         return res.status(403).send('🛡️ Keamanan Sistem: Aktivitas ilegal terdeteksi (Bad CSRF Token). Request ditolak.');
@@ -310,7 +362,35 @@ app.use((err, req, res, next) => {
     next(err);
 });
 
-// Jalankan Server Aplikasi
+app.get('/buat-admin-pasti-jadi', async (req, res) => {
+    try {
+        const salt = await bcrypt.genSalt(10);
+        const hashAman = await bcrypt.hash('admin', salt);
+        
+        db.execute("DELETE FROM users WHERE username = 'reza_admin'", [], (err) => {
+            if (err) return res.status(500).send("Gagal membersihkan user lama: " + err.message);
+            
+            const queryInsert = "INSERT INTO users (username, password, role) VALUES ('reza_admin', ?, 'admin')";
+            db.execute(queryInsert, [hashAman], (errInsert) => {
+                if (errInsert) return res.status(500).send("Gagal injeksi user baru: " + errInsert.message);
+                
+                res.send(`
+                    <div style="font-family:sans-serif; padding:20px; background:#e6fffa; border:2px solid #319795;">
+                        <h2>🚀 Akun Admin Berhasil Dibuat Bersih!</h2>
+                        <p>Username: <b>reza_admin</b></p>
+                        <p>Password asli: <b>admin</b></p>
+                        <p>Hash baru dari server: <code>${hashAman}</code></p>
+                        <hr>
+                        <p>👉 Silakan balik ke halaman <a href="http://localhost:3000/login"><b>/login</b></a> dan tes sekarang.</p>
+                    </div>
+                `);
+            });
+        });
+    } catch (e) {
+        res.status(500).send("Error System: " + e.message);
+    }
+});
+
 app.listen(PORT, () => {
     console.log(`📡 EcoDrop Web Server aktif berjalan pada port http://localhost:${PORT}`);
 });
