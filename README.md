@@ -47,5 +47,5 @@ Aplikasi ini mengadopsi prinsip *Secure by Design* untuk memitigasi kerentanan p
 
 1. **Clone Repositori dan Masuk ke Direktori Proyek**
    ```bash
-   git clone [https://github.com/username/ecodrop.git](https://github.com/username/ecodrop.git)
+   git clone [https://github.com/Badduxk/ecodrop.git](https://github.com/Badduxk/ecodrop.git)
    cd ecodrop
