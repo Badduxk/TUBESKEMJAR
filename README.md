@@ -35,17 +35,3 @@ Aplikasi ini mengadopsi prinsip *Secure by Design* untuk memitigasi kerentanan p
 
 ---
 
-## 🚀 Panduan Instalasi (Installation Guide)
-
-### 📋 Prasyarat Sistem
-* Ubuntu Server / VM Ubuntu (v20.04 LTS atau terbaru)
-* Node.js (v18.x atau v20.x) & NPM
-* MySQL Server (Laragon / XAMPP / Native MySQL)
-* Nginx Web Server
-
-### 📂 Langkah 1: Setup Aplikasi Web (EcoDrop)
-
-1. **Clone Repositori dan Masuk ke Direktori Proyek**
-   ```bash
-   git clone [https://github.com/Badduxk/ecodrop.git](https://github.com/Badduxk/ecodrop.git)
-   cd ecodrop
